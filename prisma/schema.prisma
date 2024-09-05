@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountType {
+  USER
+  BUSINESS
+  GUEST
+  ADMIN
+  STAFF
+}
+
+model Role {
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  permissions   Json
+  user          User           @relation(fields: [userId], references: [id], onDelete: NoAction)
+  userId        String         @db.ObjectId
+  // business      Business?      @relation(fields: [businessId], references: [id], onDelete: NoAction)
+  businessId    String?        @db.ObjectId
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  staffProfiles StaffProfile[]
+
+  @@unique([userId, businessId, name])
+}
+
+model User {
+  id                   String         @id @default(auto()) @map("_id") @db.ObjectId
+  firstName            String
+  lastName             String
+  email                String?        @unique
+  password             String? // Optional for guests
+  avatar               String?        @default("https://aui.atlassian.com/aui/9.3/docs/images/avatar-person.svg")
+  isAdmin              Boolean        @default(false)
+  accountType          AccountType
+  emailVerified        Boolean        @default(false)
+  verificationToken    String?
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+  reviews              Review[]
+  replies              Reply[]
+  notes                String?
+  lastLogin            DateTime?
+  twoFactorEnabled     Boolean        @default(false)
+  twoFactorSecret      String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  roles                Role[]
+  staffProfiles        StaffProfile[]
+}
+
+model Guest {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  email      String   @unique
+  notes      String?
+  image      String?
+  businessId String   @db.ObjectId
+  reviews    Review[]
+  // business   Business? @relation(fields: [businessId], references: [id], onDelete: NoAction)
+}
+
+model StaffProfile {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String    @db.ObjectId
+  // business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String    @db.ObjectId
+  role       Role?     @relation(fields: [roleId], references: [id], onDelete: NoAction)
+  roleId     String?   @db.ObjectId
+  startDate  DateTime  @default(now())
+  endDate    DateTime?
+  isActive   Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, businessId])
+  @@index([userId])
+  @@index([businessId])
+}
+
+model Category {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String  @unique
+  description String?
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Review {
+  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  rating     Float?       @default(0.0)
+  food       Int?
+  staff      Int?
+  ambience   Int?
+  comment    String
+  status     ReviewStatus @default(PENDING)
+  userId     String?      @db.ObjectId
+  user       User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestId    String?      @db.ObjectId
+  guest      Guest?       @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  businessId String       @db.ObjectId
+  // business   Business     @relation(fields: [businessId], references: [id], onDelete: NoAction)
+  replies    Reply[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Reply {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  content         String
+  parentReplyId   String?  @db.ObjectId
+  parentReply     Reply?   @relation("subReplies", fields: [parentReplyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subReplies      Reply[]  @relation("subReplies")
+  reviewId        String   @db.ObjectId
+  review          Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId          String   @db.ObjectId
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  edited          Boolean? @default(false)
+  originalContent String?
+  deleted         Boolean? @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([id])
+}
